@@ -1,5 +1,7 @@
 package mx.kenzie.solar;
 
+import mx.kenzie.solar.host.Server;
+
 import java.net.InetAddress;
 
 public class Solar {
@@ -9,7 +11,7 @@ public class Solar {
     }
     
     public static Orbit connect(InetAddress address, int port) {
-        return null; // todo
+        return new Orbit(Server.connect(address, port));
     }
     
 }

@@ -32,6 +32,7 @@ public class LocalVMServer extends JVMServer {
     }
     
     private void open(Socket socket) throws IOException {
+        
         final RemoteVMServer server = new RemoteVMServer(new InetSocketAddress(socket.getInetAddress(), socket.getPort()), socket);
         while (socket.isConnected()) {
             final InputStream stream = socket.getInputStream();
