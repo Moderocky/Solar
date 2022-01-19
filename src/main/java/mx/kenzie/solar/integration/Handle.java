@@ -12,6 +12,8 @@ public interface Handle<Type> {
     
     Type reference();
     
+    Type stub();
+    
     VMServer owner();
     
     boolean isOwner(VMServer server);

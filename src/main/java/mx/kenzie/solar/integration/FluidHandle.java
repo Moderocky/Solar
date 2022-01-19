@@ -12,7 +12,7 @@ import mx.kenzie.solar.host.RemoteVMServer;
 import mx.kenzie.solar.host.Server;
 import mx.kenzie.solar.host.VMServer;
 
-public class FluidHandle<Type> implements Handle<Type> {
+public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type> {
     
     protected final Class<Type> type;
     protected final Code code;
@@ -27,6 +27,7 @@ public class FluidHandle<Type> implements Handle<Type> {
     }
     
     protected FluidHandle(VMServer server, Code code, Class<Type> type, MethodExecutor executor) {
+        super(type);
         this.server = server;
         this.code = code;
         this.type = type;

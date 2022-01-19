@@ -41,6 +41,11 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
     }
     
     @Override
+    public Type stub() {
+        return object;
+    }
+    
+    @Override
     public Ownership getOwnership(VMServer server) {
         if (server.equals(this.server)) return Ownership.FULL;
         return server.getOwnership(this);

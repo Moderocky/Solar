@@ -25,11 +25,12 @@ public class LocalVMServer extends JVMServer {
     protected final SocketHub hub;
     protected final Map<Code, Handle<?>> handles = new HashMap<>();
     protected final Map<InetSocketAddress, RemoteVMServer> servers = new HashMap<>();
+    
     LocalVMServer(int port) throws IOException {
         super(true);
         this.hub = new SocketHub(port, this::open);
     }
-
+    
     private void open(Socket socket) throws IOException {
         final InetSocketAddress address = new InetSocketAddress(socket.getInetAddress(), socket.getPort());
         final RemoteVMServer server = new RemoteVMServer(address, socket);

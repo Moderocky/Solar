@@ -35,6 +35,11 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     }
     
     @Override
+    public Type stub() {
+        return object;
+    }
+    
+    @Override
     public Ownership getOwnership(VMServer server) {
         if (server.local()) return Ownership.FULL;
         return server.getOwnership(this);
