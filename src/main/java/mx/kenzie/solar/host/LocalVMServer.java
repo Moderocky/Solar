@@ -34,7 +34,7 @@ public class LocalVMServer extends JVMServer {
     private void open(Socket socket) throws IOException {
         final InetSocketAddress address = new InetSocketAddress(socket.getInetAddress(), socket.getPort());
         final RemoteVMServer server = new RemoteVMServer(address, socket);
-        servers.put(address, server);
+        this.servers.put(address, server);
         while (socket.isConnected()) {
             final InputStream stream = socket.getInputStream();
             final int protocol = socket.getInputStream().read();
@@ -96,6 +96,8 @@ public class LocalVMServer extends JVMServer {
                 }
             }
         }
+        this.servers.remove(address);
+        server.close();
     }
     
     private Object call(Code code, MethodErasure erasure, Object[] arguments) {

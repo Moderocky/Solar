@@ -77,6 +77,15 @@ However, there may be occasions where an object ought to be 'moved' according to
 An example of this might be when an object is purely functional and needs to perform some action on the virtual machine it exists in (e.g. interacting with files or some local data.)
 In this case, the object should use a 'fluid' handle. Another virtual machine may request the reins to the object, at which point access will throttle until the object is fully transferred to the new host.
 
+Reins must be acquired by a local server, which will integrate that server into the object ownership network.
+
+## Stubs
+
+To avoid the inevitable problem of references becoming invalid due to a handle moving, programs may keep an object 'stub' instead of the direct reference or caching the handle.
+
+The stub is guaranteed to be valid and constant for as long as the handle itself is valid (i.e. the `stub()` method will return the same stub until the volatile object is killed and garbage-collected.)
+The stub may in fact be the reference itself for some constant handle varieties (such as explicitly-local handles) but this is not a guarantee.
+
 ## Handles
 
 Exporting or retrieving an object gives a 'handle'. These handles hold a volatile reference to the object.
