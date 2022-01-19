@@ -1,18 +1,17 @@
 package mx.kenzie.solar.test;
 
 import mx.kenzie.solar.host.Server;
-import mx.kenzie.solar.host.VMServer;
 import mx.kenzie.solar.integration.Code;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.InetAddress;
 
-public class InterfaceTest {
+public class TransferTest {
     
     static InetAddress address = InetAddress.getLoopbackAddress();
-    static VMServer local = Server.create(5456);
-    static VMServer server = Server.connect(address, 5456);
+    static Server local = Server.create(5456);
+    static Server server = Server.connect(address, 5456);
     
     @BeforeClass
     public static void setup() {

@@ -1,6 +1,7 @@
 package mx.kenzie.solar.integration;
 
 import mx.kenzie.mimic.MethodErasure;
+import mx.kenzie.solar.host.Server;
 import mx.kenzie.solar.host.VMServer;
 
 public interface Handle<Type> {
@@ -21,7 +22,13 @@ public interface Handle<Type> {
     
     boolean hasReins();
     
-    void acquireReins();
+    default void acquireReins(Server server) {
+    
+    }
+    
+    default void dispatchReins(Server server) {
+    
+    }
     
     Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException;
     

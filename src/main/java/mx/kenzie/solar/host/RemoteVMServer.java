@@ -4,13 +4,9 @@ import mx.kenzie.jupiter.socket.SocketHub;
 import mx.kenzie.mimic.MethodErasure;
 import mx.kenzie.solar.connection.Protocol;
 import mx.kenzie.solar.error.ConnectionError;
+import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
-import mx.kenzie.solar.integration.Code;
-import mx.kenzie.solar.integration.Handle;
-import mx.kenzie.solar.integration.LocalHandle;
-import mx.kenzie.solar.integration.RemoteHandle;
-import mx.kenzie.solar.marshal.Marshaller;
-import mx.kenzie.solar.marshal.StandardMarshaller;
+import mx.kenzie.solar.integration.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,13 +19,11 @@ public class RemoteVMServer extends JVMServer implements VMServer {
     
     protected final InetSocketAddress address;
     protected final Socket socket;
-    protected Marshaller marshaller;
     
     protected RemoteVMServer(InetSocketAddress address, Socket socket) {
         super(false);
         this.address = address;
         this.socket = socket;
-        this.marshaller = new StandardMarshaller();
     }
     
     static RemoteVMServer connect(InetAddress address, int port) throws ConnectionError {
@@ -41,21 +35,91 @@ public class RemoteVMServer extends JVMServer implements VMServer {
     }
     
     @Override
+    public InetSocketAddress address() {
+        return address;
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public <Type> Type acquire(Code code, InetSocketAddress address) {
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.RECEIVE_OBJECT);
+                stream.write(code.bytes());
+                this.marshaller.transfer(address, stream);
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to send transfer request.", ex);
+            }
+            try {
+                final InputStream stream = this.socket.getInputStream();
+                final Type type = (Type) this.marshaller.receive(stream);
+                return type;
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to send transfer request.", ex);
+            }
+        }
+    }
+    
+    @Override
     public <Type> Handle<Type> export(Type object, Code code) {
+        return this.export(object, code, HandlerMode.LOCAL);
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public <Type> Handle<Type> export(Type object, Code code, HandlerMode mode) {
+        if (mode == HandlerMode.LOCAL) {
+            throw new IllegalStateException("Cannot create local handle in a remote server.");
+        }
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.SEND_OBJECT);
+                stream.write(code.bytes());
+                this.marshaller.transfer(object, stream);
+                stream.write(mode.ordinal());
+            } catch (IOException ex) {
+                throw new MethodCallError("Unable to transfer ownership.", ex);
+            }
+        }
+        return switch (mode) {
+            case FLUID -> FluidHandle.createRemote(this, code, (Class<Type>) object.getClass());
+            default -> new RemoteHandle<>(this, code, (Class<Type>) object.getClass());
+        };
+    }
+    
+    @Override
+    public <Type> void export(Handle<Type> handle) {
+        final Code code = handle.code();
         synchronized (socket) {
             try {
                 final OutputStream stream = this.socket.getOutputStream();
                 stream.write(Protocol.DISPATCH_HANDLE);
                 stream.write(code.bytes());
-                this.marshaller.transfer(object.getClass(), stream);
+                stream.write(handle instanceof FluidHandle<Type> ? 1 : 0);
+                this.marshaller.transfer(handle.owner().address(), stream);
+                this.marshaller.transfer(handle.type(), stream);
             } catch (IOException ex) {
                 throw new MethodCallError("Unable to dispatch handle.", ex);
             }
         }
-        return new LocalHandle<>(this, code, object);
     }
     
     @Override
+    public void close() {
+        try {
+            synchronized (handles) {
+                this.handles.clear();
+            }
+            this.socket.close();
+        } catch (IOException e) {
+            throw new IOError(e);
+        }
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
     public <Type> Handle<Type> request(Code code) {
         synchronized (socket) {
             try {
@@ -67,10 +131,14 @@ public class RemoteVMServer extends JVMServer implements VMServer {
             }
             try {
                 final InputStream stream = this.socket.getInputStream();
+                final HandlerMode mode = HandlerMode.values()[stream.read()];
                 final Object object = this.marshaller.receive(stream);
                 if (object == null) return null;
                 if (!(object instanceof Class<?> type)) return null;
-                return (Handle<Type>) new RemoteHandle<>(this, code, type);
+                return (Handle<Type>) switch (mode) {
+                    case FLUID -> FluidHandle.createRemote(this, code, type);
+                    default -> new RemoteHandle<>(this, code, type);
+                };
             } catch (IOException ex) {
                 throw new MethodCallError("Unable to retrieve object handle.", ex);
             }
@@ -91,7 +159,8 @@ public class RemoteVMServer extends JVMServer implements VMServer {
             }
             try {
                 final InputStream stream = this.socket.getInputStream();
-                return this.marshaller.receive(stream);
+                final Object object = this.marshaller.receive(stream);
+                return object;
             } catch (IOException ex) {
                 throw new MethodCallError("Unable to retrieve method call result.", ex);
             }

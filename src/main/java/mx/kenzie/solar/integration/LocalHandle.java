@@ -51,10 +51,6 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     }
     
     @Override
-    public void acquireReins() {
-    
-    }
-    
     public Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
         if (cache.has(erasure)) return cache.get(erasure).invoke(arguments);
         final MethodAccessor<?> accessor = Mirror.of(object).method(erasure.reflect());

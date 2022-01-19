@@ -4,16 +4,13 @@ import mx.kenzie.jupiter.socket.SocketHub;
 import mx.kenzie.mimic.MethodErasure;
 import mx.kenzie.solar.connection.Protocol;
 import mx.kenzie.solar.error.ConnectionError;
+import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
-import mx.kenzie.solar.integration.Code;
-import mx.kenzie.solar.integration.Handle;
-import mx.kenzie.solar.integration.LocalHandle;
-import mx.kenzie.solar.integration.RemoteHandle;
-import mx.kenzie.solar.marshal.Marshaller;
-import mx.kenzie.solar.marshal.StandardMarshaller;
+import mx.kenzie.solar.integration.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.HashMap;
@@ -21,19 +18,22 @@ import java.util.Map;
 
 public class LocalVMServer extends JVMServer {
     
+    static {
+        System.setProperty("solar.default_port", "5150");
+    }
+    
     protected final SocketHub hub;
     protected final Map<Code, Handle<?>> handles = new HashMap<>();
-    protected Marshaller marshaller;
-    
+    protected final Map<InetSocketAddress, RemoteVMServer> servers = new HashMap<>();
     LocalVMServer(int port) throws IOException {
         super(true);
         this.hub = new SocketHub(port, this::open);
-        this.marshaller = new StandardMarshaller();
     }
-    
+
     private void open(Socket socket) throws IOException {
-        
-        final RemoteVMServer server = new RemoteVMServer(new InetSocketAddress(socket.getInetAddress(), socket.getPort()), socket);
+        final InetSocketAddress address = new InetSocketAddress(socket.getInetAddress(), socket.getPort());
+        final RemoteVMServer server = new RemoteVMServer(address, socket);
+        servers.put(address, server);
         while (socket.isConnected()) {
             final InputStream stream = socket.getInputStream();
             final int protocol = socket.getInputStream().read();
@@ -52,16 +52,46 @@ public class LocalVMServer extends JVMServer {
                     synchronized (handles) {
                         handle = handles.get(code);
                     }
-                    this.marshaller.transfer(handle.type(), socket.getOutputStream());
+                    final OutputStream target = socket.getOutputStream();
+                    target.write(handle instanceof FluidHandle<?> ? HandlerMode.FLUID.ordinal() : HandlerMode.REMOTE.ordinal());
+                    this.marshaller.transfer(handle.type(), target);
                 }
                 case Protocol.DISPATCH_HANDLE -> {
                     final Code code = Code.read(stream);
-                    final Handle<?> handle = handles.get(code);
+                    final boolean fluid = stream.read() == 1;
+                    final InetSocketAddress target = (InetSocketAddress) this.marshaller.receive(stream);
+                    final VMServer owner = servers.get(target);
                     final Class<?> type = (Class<?>) this.marshaller.receive(stream);
+                    final Handle<?> handle = fluid
+                        ? FluidHandle.createRemote(owner, code, type)
+                        : new RemoteHandle<>(owner, code, type);
                     synchronized (handles) {
-                        this.handles.put(code, new RemoteHandle<>(server, code, type));
+                        this.handles.put(code, handle);
+                        assert handles.containsKey(code);
                     }
-                    this.marshaller.transfer(handle.type(), socket.getOutputStream());
+                }
+                case Protocol.RECEIVE_OBJECT -> {
+                    final Code code = Code.read(stream);
+                    final InetSocketAddress target = (InetSocketAddress) marshaller.receive(stream);
+                    final Handle<?> handle = handles.get(code);
+                    final Object object;
+                    final VMServer owner = establishLink(target);
+                    if (!handle.hasReins()) object = handle.owner().acquire(code, target);
+                    else object = handle.reference();
+                    handle.dispatchReins(owner);
+                    this.marshaller.transfer(object, socket.getOutputStream());
+                }
+                case Protocol.SEND_OBJECT -> {
+                    final Code code = Code.read(stream);
+                    final Object object = marshaller.receive(stream);
+                    final HandlerMode mode = HandlerMode.values()[stream.read()];
+                    final Handle<?> handle = switch (mode) {
+                        case FLUID -> FluidHandle.createLocal(this, code, object);
+                        default -> new LocalHandle<>(this, code, object);
+                    };
+                    synchronized (handles) {
+                        this.handles.put(code, handle);
+                    }
                 }
             }
         }
@@ -76,6 +106,17 @@ public class LocalVMServer extends JVMServer {
         }
     }
     
+    protected VMServer establishLink(InetSocketAddress address) {
+        if (servers.containsKey(address)) return servers.get(address);
+        final RemoteVMServer remote = (RemoteVMServer) Server.connect(address);
+        this.servers.put(address, remote);
+        return remote;
+    }
+    
+    public static int defaultPort() {
+        return Integer.parseInt(System.getProperty("solar.default_port", "5150"));
+    }
+    
     static LocalVMServer create(int port) throws ConnectionError {
         try {
             return new LocalVMServer(port);
@@ -85,8 +126,30 @@ public class LocalVMServer extends JVMServer {
     }
     
     @Override
+    public InetSocketAddress address() {
+        return new InetSocketAddress(hub.getAddress(), hub.getPort());
+    }
+    
+    @Override
+    public <Type> Type acquire(Code code, InetSocketAddress address) {
+        final Handle<Type> handle = (Handle<Type>) handles.get(code);
+        if (handle.hasReins()) return handle.reference();
+        return handle.owner().acquire(code, address);
+    }
+    
+    @Override
     public <Type> Handle<Type> export(Type object, Code code) {
-        final LocalHandle<Type> handle = new LocalHandle<>(this, code, object);
+        return this.export(object, code, HandlerMode.LOCAL);
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public <Type> Handle<Type> export(Type object, Code code, HandlerMode mode) {
+        final Handle<Type> handle;
+        switch (mode) {
+            case FLUID -> handle = FluidHandle.createLocal(this, code, (Class<Type>) object.getClass(), object);
+            default -> handle = new LocalHandle<>(this, code, object);
+        }
         synchronized (handles) {
             this.handles.put(code, handle);
         }
@@ -94,9 +157,50 @@ public class LocalVMServer extends JVMServer {
     }
     
     @Override
+    public <Type> void export(Handle<Type> handle) {
+        synchronized (handles) {
+            if (handles.containsValue(handle)) return;
+            this.handles.put(handle.code(), handle);
+        }
+    }
+    
+    @Override
+    public void close() {
+        try {
+            synchronized (handles) {
+                this.handles.clear();
+            }
+            this.hub.close();
+        } catch (IOException e) {
+            throw new IOError(e);
+        }
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
     public <Type> Handle<Type> request(Code code) {
         synchronized (handles) {
             return (Handle<Type>) handles.get(code);
         }
+    }
+    
+    public void install(Handle<?> handle) {
+        synchronized (handles) {
+            this.handles.put(handle.code(), handle);
+        }
+        this.establishLink(handle.owner());
+    }
+    
+    protected void establishLink(VMServer server) {
+        if (servers.containsKey(server.address())) return;
+        final RemoteVMServer remote;
+        if (server instanceof RemoteVMServer) remote = (RemoteVMServer) server;
+        else remote = (RemoteVMServer) Server.connect(server.address());
+        this.servers.put(server.address(), remote);
+    }
+    
+    protected RemoteVMServer getServer(Socket socket) {
+        final InetSocketAddress address = new InetSocketAddress(socket.getInetAddress(), socket.getPort());
+        return servers.get(address);
     }
 }

@@ -57,12 +57,7 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
     }
     
     @Override
-    public void acquireReins() {
-    
-    }
-    
-    @Override
-    public Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
+    public Object callMethod(MethodErasure erasure, Object... arguments) {
         return invoke(null, erasure, arguments);
     }
     
