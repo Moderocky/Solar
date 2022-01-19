@@ -2,11 +2,13 @@ package mx.kenzie.solar.host;
 
 import mx.kenzie.jupiter.socket.SocketHub;
 import mx.kenzie.mimic.MethodErasure;
+import mx.kenzie.solar.connection.ConnectionOptions;
 import mx.kenzie.solar.connection.Protocol;
 import mx.kenzie.solar.error.ConnectionError;
 import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
 import mx.kenzie.solar.integration.*;
+import mx.kenzie.solar.security.SecurityKey;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,13 +27,21 @@ public class LocalVMServer extends JVMServer {
     protected final SocketHub hub;
     protected final Map<Code, Handle<?>> handles = new HashMap<>();
     protected final Map<InetSocketAddress, RemoteVMServer> servers = new HashMap<>();
+    protected final SecurityKey key;
     
-    LocalVMServer(int port) throws IOException {
+    LocalVMServer(int port, ConnectionOptions options) throws IOException {
         super(true);
-        this.hub = new SocketHub(port, this::open);
+        if (options.ssl()) this.hub = SocketHub.createSecure(port, this::open);
+        else this.hub = new SocketHub(port, this::open);
+        this.key = options.key();
     }
     
     private void open(Socket socket) throws IOException {
+        if (!this.key.match(socket.getInputStream())) {
+            socket.getOutputStream().write(Protocol.FAIL_CONNECTION);
+            return;
+        }
+        socket.getOutputStream().write(Protocol.ESTABLISH_CONNECTION);
         final InetSocketAddress address = new InetSocketAddress(socket.getInetAddress(), socket.getPort());
         final RemoteVMServer server = new RemoteVMServer(address, socket);
         this.servers.put(address, server);
@@ -121,11 +131,32 @@ public class LocalVMServer extends JVMServer {
     }
     
     static LocalVMServer create(int port) throws ConnectionError {
+        return create(port, ConnectionOptions.DEFAULT);
+    }
+    
+    static LocalVMServer create(int port, ConnectionOptions options) throws ConnectionError {
         try {
-            return new LocalVMServer(port);
+            return new LocalVMServer(port, options);
         } catch (IOException ex) {
             throw new ConnectionError("Unable to create local server.", ex);
         }
+    }
+    
+    public void install(Handle<?> handle) {
+        synchronized (handles) {
+            this.handles.put(handle.code(), handle);
+        }
+        this.establishLink(handle.owner());
+    }
+    
+    protected void establishLink(VMServer server) {
+        if (this == server) return;
+        if (servers.containsKey(server.address())) return;
+        if (this.address().equals(server.address())) return;
+        final RemoteVMServer remote;
+        if (server instanceof RemoteVMServer) remote = (RemoteVMServer) server;
+        else remote = (RemoteVMServer) Server.connect(server.address());
+        this.servers.put(server.address(), remote);
     }
     
     @Override
@@ -185,21 +216,6 @@ public class LocalVMServer extends JVMServer {
         synchronized (handles) {
             return (Handle<Type>) handles.get(code);
         }
-    }
-    
-    public void install(Handle<?> handle) {
-        synchronized (handles) {
-            this.handles.put(handle.code(), handle);
-        }
-        this.establishLink(handle.owner());
-    }
-    
-    protected void establishLink(VMServer server) {
-        if (servers.containsKey(server.address())) return;
-        final RemoteVMServer remote;
-        if (server instanceof RemoteVMServer) remote = (RemoteVMServer) server;
-        else remote = (RemoteVMServer) Server.connect(server.address());
-        this.servers.put(server.address(), remote);
     }
     
     protected RemoteVMServer getServer(Socket socket) {

@@ -2,11 +2,13 @@ package mx.kenzie.solar.host;
 
 import mx.kenzie.jupiter.socket.SocketHub;
 import mx.kenzie.mimic.MethodErasure;
+import mx.kenzie.solar.connection.ConnectionOptions;
 import mx.kenzie.solar.connection.Protocol;
 import mx.kenzie.solar.error.ConnectionError;
 import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
 import mx.kenzie.solar.integration.*;
+import mx.kenzie.solar.security.SecurityKey;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,11 +29,34 @@ public class RemoteVMServer extends JVMServer implements VMServer {
     }
     
     static RemoteVMServer connect(InetAddress address, int port) throws ConnectionError {
+        return connect(address, port, ConnectionOptions.DEFAULT);
+    }
+    
+    static RemoteVMServer connect(InetAddress address, int port, ConnectionOptions options) throws ConnectionError {
         try {
-            return new RemoteVMServer(new InetSocketAddress(address, port), SocketHub.connect(address, port));
+            final RemoteVMServer server;
+            if (options.ssl())
+                server = new RemoteVMServer(new InetSocketAddress(address, port), SocketHub.connectSecure(address, port));
+            else server = new RemoteVMServer(new InetSocketAddress(address, port), SocketHub.connect(address, port));
+            if (server.init(options.key()) != Protocol.ESTABLISH_CONNECTION) {
+                throw new ConnectionError("Security key match failed.");
+            }
+            return server;
         } catch (IOException ex) {
             throw new ConnectionError("Unable to establish remote connection.", ex);
         }
+    }
+    
+    protected int init(SecurityKey key) throws IOException {
+        while (!socket.isConnected()) {
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        key.write(socket.getOutputStream());
+        return socket.getInputStream().read();
     }
     
     @Override

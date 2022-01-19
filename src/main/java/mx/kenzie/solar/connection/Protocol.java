@@ -13,6 +13,7 @@ public interface Protocol {
         DISPATCH_HANDLE = 7, // code, owner, object
         PREPARE_CLASS = 8,
         REQUEST_CLASS = 9,
-        CREATE_HOOK = 10;
+        CREATE_HOOK = 10,
+        FAIL_CONNECTION = 11;
     
 }
