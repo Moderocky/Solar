@@ -2,6 +2,7 @@ package mx.kenzie.solar.test;
 
 import mx.kenzie.solar.host.Server;
 import mx.kenzie.solar.integration.Code;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -15,9 +16,12 @@ public class TransferTest {
     
     @BeforeClass
     public static void setup() {
-        final Code code = new Code("thing");
-        final MyCoolThing thing = new MyCoolThing();
-        assert local.export(thing, code) != null;
+        local.clear();
+    }
+    
+    @AfterClass
+    public static void after() {
+        local.clear();
     }
     
     @Test
@@ -25,19 +29,24 @@ public class TransferTest {
         final Code code = new Code("bean");
         final MyCoolThing thing = new MyCoolThing();
         assert local.export(thing, code) != null;
+        local.remove(code);
     }
     
     @Test
     public void retrieve() {
         final Code code = new Code("thing");
+        final MyCoolThing thing = new MyCoolThing();
+        assert local.export(thing, code) != null;
         final MyCoolThing remote = server.<MyCoolThing>request(code).reference();
         assert remote != null;
         assert remote.toString().equals("hello from the other side");
+        local.remove(code);
     }
     
     @Test
     @SuppressWarnings("all")
     public void test() {
+        local.clear();
         final Code code = new Code("hello there");
         final MyCoolThing thing = new MyCoolThing();
         assert local.export(thing, code) != null;
@@ -52,8 +61,12 @@ public class TransferTest {
         final Code check = new Code("lettuce");
         assert local.export(new MyCoolThing(), check) != null;
         assert local.has(check);
+        assert server.contents().length == 2;
         local.remove(check);
         assert !local.has(check);
+        local.clear();
+        assert local.contents().length == 0;
+        assert server.contents().length == 0;
     }
     
     static class MyCoolThing {

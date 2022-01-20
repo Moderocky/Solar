@@ -68,6 +68,8 @@ public interface Server extends AutoCloseable {
     
     <Type> Handle<Type> request(Code code);
     
+    void clear();
+    
     default boolean has(Handle<?> handle) {
         return this.has(handle.code());
     }
@@ -81,6 +83,8 @@ public interface Server extends AutoCloseable {
     void remove(Code code);
     
     void close();
+    
+    Code[] contents();
     
     void marshal(Marshaller marshaller);
     

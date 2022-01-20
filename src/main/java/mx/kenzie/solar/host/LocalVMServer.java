@@ -57,6 +57,13 @@ public class LocalVMServer extends JVMServer {
                     final Object result = this.call(code, erasure, arguments);
                     this.marshaller.transfer(result, socket.getOutputStream());
                 }
+                case Protocol.EMPTY -> {
+                    this.clear();
+                }
+                case Protocol.GET_CONTENTS -> {
+                    final OutputStream target = socket.getOutputStream();
+                    this.marshaller.transfer(this.contents(), target);
+                }
                 case Protocol.HAS_HANDLE -> {
                     final Code code = Code.read(stream);
                     final OutputStream target = socket.getOutputStream();
@@ -208,6 +215,13 @@ public class LocalVMServer extends JVMServer {
     }
     
     @Override
+    public void clear() {
+        synchronized (handles) {
+            this.handles.clear();
+        }
+    }
+    
+    @Override
     public boolean has(Code code) {
         return handles.containsKey(code);
     }
@@ -230,6 +244,13 @@ public class LocalVMServer extends JVMServer {
             this.hub.close();
         } catch (IOException e) {
             throw new IOError(e);
+        }
+    }
+    
+    @Override
+    public Code[] contents() {
+        synchronized (handles) {
+            return handles.keySet().toArray(new Code[0]);
         }
     }
     

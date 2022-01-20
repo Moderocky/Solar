@@ -11,11 +11,12 @@ public interface Protocol {
         METHOD_CALL = 5,
         REQUEST_HANDLE = 6,
         DISPATCH_HANDLE = 7, // code, owner, object
-        PREPARE_CLASS = 8,
+        EMPTY = 8,
         REQUEST_CLASS = 9,
         CREATE_HOOK = 10,
         FAIL_CONNECTION = 11,
         DESTROY_HANDLE = 12,
-        HAS_HANDLE = 13; // code -> answer
+        HAS_HANDLE = 13, // code -> answer
+        GET_CONTENTS = 14; // -> codes
     
 }

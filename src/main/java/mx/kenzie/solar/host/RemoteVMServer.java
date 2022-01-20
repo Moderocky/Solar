@@ -132,6 +132,18 @@ public class RemoteVMServer extends JVMServer implements VMServer {
     }
     
     @Override
+    public void clear() {
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.EMPTY);
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to send empty request.", ex);
+            }
+        }
+    }
+    
+    @Override
     public boolean has(Code code) {
         synchronized (socket) {
             try {
@@ -172,6 +184,24 @@ public class RemoteVMServer extends JVMServer implements VMServer {
             this.socket.close();
         } catch (IOException e) {
             throw new IOError(e);
+        }
+    }
+    
+    @Override
+    public Code[] contents() {
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.GET_CONTENTS);
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to ask for contents.", ex);
+            }
+            try {
+                final InputStream stream = this.socket.getInputStream();
+                return (Code[]) marshaller.receive(stream);
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to receive contends.", ex);
+            }
         }
     }
     

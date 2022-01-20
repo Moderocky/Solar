@@ -2,12 +2,13 @@ package mx.kenzie.solar.integration;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.lang.constant.Constable;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
-public record Code(long code) {
+public record Code(long code) implements Serializable {
     
     public Code(String code) {
         this(convert(code));
