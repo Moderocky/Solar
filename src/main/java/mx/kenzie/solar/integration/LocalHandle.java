@@ -6,7 +6,7 @@ import mx.kenzie.mirror.MethodCache;
 import mx.kenzie.mirror.Mirror;
 import mx.kenzie.solar.host.VMServer;
 
-public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handle<Type> {
+public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handle<Type>, DestructibleHandle {
     
     protected final Code code;
     protected final MethodCache cache;
@@ -25,6 +25,7 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     }
     
     @Override
+    @SuppressWarnings("unchecked")
     public Class<Type> type() {
         return (Class<Type>) object.getClass();
     }
@@ -56,11 +57,17 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     }
     
     @Override
-    public Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
+    public synchronized Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
+        if (object == null) return null;
         if (cache.has(erasure)) return cache.get(erasure).invoke(arguments);
         final MethodAccessor<?> accessor = Mirror.of(object).method(erasure.reflect());
         this.cache.cache(erasure, accessor);
         return accessor.invoke(arguments);
+    }
+    
+    @Override
+    public synchronized void destroy() {
+        this.object = null;
     }
     
     @Override

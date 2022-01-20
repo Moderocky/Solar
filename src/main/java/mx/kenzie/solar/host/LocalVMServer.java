@@ -215,6 +215,8 @@ public class LocalVMServer extends JVMServer {
     @Override
     public void remove(Code code) {
         synchronized (handles) {
+            final Handle<?> handle = this.handles.get(code);
+            if (handle instanceof DestructibleHandle destroy) destroy.destroy();
             this.handles.remove(code);
         }
     }

@@ -6,7 +6,7 @@ import mx.kenzie.mimic.Mimic;
 import mx.kenzie.solar.host.RemoteVMServer;
 import mx.kenzie.solar.host.VMServer;
 
-public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Handle<Type> {
+public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Handle<Type>, DestructibleHandle {
     
     protected final Class<Type> type;
     protected final Code code;
@@ -71,5 +71,10 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
             return server.call(code, erasure, arguments);
         }
         return null;
+    }
+    
+    @Override
+    public synchronized void destroy() {
+        this.object = null;
     }
 }

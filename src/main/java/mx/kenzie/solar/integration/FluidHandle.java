@@ -12,7 +12,7 @@ import mx.kenzie.solar.host.RemoteVMServer;
 import mx.kenzie.solar.host.Server;
 import mx.kenzie.solar.host.VMServer;
 
-public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type> {
+public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type>, DestructibleHandle {
     
     protected final Class<Type> type;
     protected final Code code;
@@ -123,6 +123,7 @@ public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type>
     @Override
     public synchronized Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
         if (reins) {
+            if (object == null) return null;
             if (cache.has(erasure)) return cache.get(erasure).invoke(arguments);
             final MethodAccessor<?> accessor = Mirror.of(object).method(erasure.reflect());
             this.cache.cache(erasure, accessor);
@@ -135,6 +136,11 @@ public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type>
             return server.call(code, erasure, arguments);
         }
         return null;
+    }
+    
+    @Override
+    public synchronized void destroy() {
+        this.object = null;
     }
     
     @Override
