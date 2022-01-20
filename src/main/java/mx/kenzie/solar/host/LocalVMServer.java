@@ -1,6 +1,7 @@
 package mx.kenzie.solar.host;
 
 import mx.kenzie.jupiter.socket.SocketHub;
+import mx.kenzie.jupiter.stream.Stream;
 import mx.kenzie.mimic.MethodErasure;
 import mx.kenzie.solar.connection.ConnectionOptions;
 import mx.kenzie.solar.connection.Protocol;
@@ -8,6 +9,7 @@ import mx.kenzie.solar.error.ConnectionError;
 import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
 import mx.kenzie.solar.integration.*;
+import mx.kenzie.solar.loader.ClassDefiner;
 import mx.kenzie.solar.security.SecurityKey;
 
 import java.io.IOException;
@@ -15,7 +17,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class LocalVMServer extends JVMServer {
@@ -57,9 +61,24 @@ public class LocalVMServer extends JVMServer {
                     final Object result = this.call(code, erasure, arguments);
                     this.marshaller.transfer(result, socket.getOutputStream());
                 }
-                case Protocol.EMPTY -> {
-                    this.clear();
+                case Protocol.TRANSFER_CLASS -> {
+                    final String name = this.marshaller.receive(stream).toString();
+                    final int length = Stream.controller(stream).readInt();
+                    final byte[] code = new byte[length];
+                    final int bytes = stream.read(code);
+                    assert bytes == length; // test only
+                    final Class<?> type = ClassDefiner.definer.defineClass(name, code);
+                    assert type != null; // test only
                 }
+                case Protocol.QUERY -> {
+                    final Query query = (Query) this.marshaller.receive(stream);
+                    final List<Code> list = new ArrayList<>();
+                    for (final Handle<?> handle : this.query(query)) list.add(handle.code());
+                    final Code[] codes = list.toArray(new Code[0]);
+                    final OutputStream target = socket.getOutputStream();
+                    this.marshaller.transfer(codes, target);
+                }
+                case Protocol.EMPTY -> this.clear();
                 case Protocol.GET_CONTENTS -> {
                     final OutputStream target = socket.getOutputStream();
                     this.marshaller.transfer(this.contents(), target);
@@ -212,6 +231,16 @@ public class LocalVMServer extends JVMServer {
             if (handles.containsValue(handle)) return;
             this.handles.put(handle.code(), handle);
         }
+    }
+    
+    @Override
+    public Handle<?>[] query(Query query) {
+        final List<Handle<?>> list;
+        synchronized (handles) {
+            list = new ArrayList<>(handles.values());
+        }
+        list.removeIf(query::noMatch);
+        return list.toArray(new Handle[0]);
     }
     
     @Override

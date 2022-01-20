@@ -5,6 +5,7 @@ import mx.kenzie.solar.error.ConnectionError;
 import mx.kenzie.solar.integration.Code;
 import mx.kenzie.solar.integration.Handle;
 import mx.kenzie.solar.integration.HandlerMode;
+import mx.kenzie.solar.integration.Query;
 import mx.kenzie.solar.marshal.Marshaller;
 import mx.kenzie.solar.security.SecurityKey;
 import mx.kenzie.solar.security.SimpleKey;
@@ -62,11 +63,18 @@ public interface Server extends AutoCloseable {
     
     <Type> Handle<Type> export(Type object, Code code, HandlerMode mode);
     
+    default <Type> Handle<Type> export(Type object) {
+        final Code code = new Code(object);
+        return this.export(object, code);
+    }
+    
     <Type> Handle<Type> export(Type object, Code code);
     
     <Type> void export(Handle<Type> handle);
     
     <Type> Handle<Type> request(Code code);
+    
+    Handle<?>[] query(Query query);
     
     void clear();
     

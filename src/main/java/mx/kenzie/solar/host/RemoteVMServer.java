@@ -1,6 +1,7 @@
 package mx.kenzie.solar.host;
 
 import mx.kenzie.jupiter.socket.SocketHub;
+import mx.kenzie.jupiter.stream.Stream;
 import mx.kenzie.mimic.MethodErasure;
 import mx.kenzie.solar.connection.ConnectionOptions;
 import mx.kenzie.solar.connection.Protocol;
@@ -8,6 +9,7 @@ import mx.kenzie.solar.error.ConnectionError;
 import mx.kenzie.solar.error.IOError;
 import mx.kenzie.solar.error.MethodCallError;
 import mx.kenzie.solar.integration.*;
+import mx.kenzie.solar.loader.SourceReader;
 import mx.kenzie.solar.security.SecurityKey;
 
 import java.io.IOException;
@@ -16,6 +18,8 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RemoteVMServer extends JVMServer implements VMServer {
     
@@ -129,6 +133,44 @@ public class RemoteVMServer extends JVMServer implements VMServer {
                 throw new MethodCallError("Unable to dispatch handle.", ex);
             }
         }
+    }
+    
+    @Override
+    public Handle<?>[] query(Query query) {
+        final Code[] codes;
+        synchronized (socket) {
+            transfer:
+            try {
+                if (query instanceof Query.TypeQuery) break transfer;
+                final byte[] code = SourceReader.reader.source(query.getClass());
+                if (code.length == 0) break transfer;
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.TRANSFER_CLASS);
+                this.marshaller.transfer(query.getClass().getName(), stream);
+                Stream.controller(stream).writeInt(code.length);
+                stream.write(code);
+            } catch (IOException ex) {
+                throw new MethodCallError("Unable to transfer query class.", ex);
+            }
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.QUERY);
+                this.marshaller.transfer(query, stream);
+            } catch (IOException ex) {
+                throw new MethodCallError("Unable to transfer query.", ex);
+            }
+            try {
+                final InputStream stream = this.socket.getInputStream();
+                codes = (Code[]) this.marshaller.receive(stream);
+            } catch (IOException ex) {
+                throw new MethodCallError("Unable to retrieve query result.", ex);
+            }
+        }
+        final List<Handle<?>> handles = new ArrayList<>();
+        for (final Code code : codes) {
+            handles.add(this.request(code));
+        }
+        return handles.toArray(new Handle[0]);
     }
     
     @Override

@@ -12,8 +12,8 @@ public interface Protocol {
         REQUEST_HANDLE = 6,
         DISPATCH_HANDLE = 7, // code, owner, object
         EMPTY = 8,
-        REQUEST_CLASS = 9,
-        CREATE_HOOK = 10,
+        TRANSFER_CLASS = 9, // name, length, bytes
+        QUERY = 10, // query
         FAIL_CONNECTION = 11,
         DESTROY_HANDLE = 12,
         HAS_HANDLE = 13, // code -> answer
