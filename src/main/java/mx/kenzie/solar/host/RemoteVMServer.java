@@ -132,6 +132,38 @@ public class RemoteVMServer extends JVMServer implements VMServer {
     }
     
     @Override
+    public boolean has(Code code) {
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.HAS_HANDLE);
+                stream.write(code.bytes());
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to send contains check.", ex);
+            }
+            try {
+                final InputStream stream = this.socket.getInputStream();
+                return stream.read() == 1;
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to receive contains result.", ex);
+            }
+        }
+    }
+    
+    @Override
+    public void remove(Code code) {
+        synchronized (socket) {
+            try {
+                final OutputStream stream = this.socket.getOutputStream();
+                stream.write(Protocol.DESTROY_HANDLE);
+                stream.write(code.bytes());
+            } catch (IOException ex) {
+                throw new ConnectionError("Unable to send destroy request.", ex);
+            }
+        }
+    }
+    
+    @Override
     public void close() {
         try {
             synchronized (handles) {

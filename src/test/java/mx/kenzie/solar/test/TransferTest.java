@@ -47,6 +47,13 @@ public class TransferTest {
         assert remote.toString().equals("hello from the other side");
         assert remote.getLength("bean") == 4;
         assert remote instanceof MyCoolThing;
+        assert local.has(code);
+        assert server.has(code);
+        final Code check = new Code("lettuce");
+        assert local.export(new MyCoolThing(), check) != null;
+        assert local.has(check);
+        local.remove(check);
+        assert !local.has(check);
     }
     
     static class MyCoolThing {
