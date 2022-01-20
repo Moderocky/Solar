@@ -38,7 +38,7 @@ public class FluidTest {
         final Blob remote = handle.reference();
         assert remote != first;
         assert remote.toString().equals("hello");
-        handle.acquireReins(other);
+        assert handle.acquireReins(other);
         assert handle.hasReins();
         assert !original.hasReins();
         assert handle.reference() instanceof Blob;

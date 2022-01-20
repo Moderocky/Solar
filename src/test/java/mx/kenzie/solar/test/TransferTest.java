@@ -17,14 +17,14 @@ public class TransferTest {
     public static void setup() {
         final Code code = new Code("thing");
         final MyCoolThing thing = new MyCoolThing();
-        local.export(thing, code);
+        assert local.export(thing, code) != null;
     }
     
     @Test
     public void export() {
         final Code code = new Code("bean");
         final MyCoolThing thing = new MyCoolThing();
-        local.export(thing, code);
+        assert local.export(thing, code) != null;
     }
     
     @Test
@@ -40,7 +40,7 @@ public class TransferTest {
     public void test() {
         final Code code = new Code("hello there");
         final MyCoolThing thing = new MyCoolThing();
-        local.export(thing, code);
+        assert local.export(thing, code) != null;
         final MyCoolThing remote = server.<MyCoolThing>request(code).reference();
         assert remote != thing;
         assert remote != null;

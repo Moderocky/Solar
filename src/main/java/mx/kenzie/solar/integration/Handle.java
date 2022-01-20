@@ -24,12 +24,12 @@ public interface Handle<Type> {
     
     boolean hasReins();
     
-    default void acquireReins(Server server) {
-    
+    default boolean acquireReins(Server server) {
+        return false;
     }
     
-    default void dispatchReins(Server server) {
-    
+    default boolean dispatchReins(Server server) {
+        return false;
     }
     
     Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException;

@@ -100,21 +100,24 @@ public class FluidHandle<Type> extends BakedHandle<Type> implements Handle<Type>
     }
     
     @Override
-    public synchronized void acquireReins(Server server) {
-        if (reins) return;
+    public synchronized boolean acquireReins(Server server) {
+        if (reins) return false;
         if (!(server instanceof LocalVMServer local))
             throw new ConnectionError("Reins must be acquired by a local server.");
         this.reins = true;
         this.object = this.server.acquire(code, local.address());
         this.server = local;
         local.install(this);
+        return true;
     }
     
     @Override
-    public synchronized void dispatchReins(Server server) {
+    public synchronized boolean dispatchReins(Server server) {
+        if (!reins) return false;
         this.reins = false;
         this.object = Mimic.create(executor, type);
         this.server = (VMServer) server;
+        return true;
     }
     
     @Override
