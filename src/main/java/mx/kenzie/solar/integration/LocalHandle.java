@@ -1,6 +1,7 @@
 package mx.kenzie.solar.integration;
 
 import mx.kenzie.mimic.MethodErasure;
+import mx.kenzie.mimic.Mimic;
 import mx.kenzie.mirror.MethodAccessor;
 import mx.kenzie.mirror.MethodCache;
 import mx.kenzie.mirror.Mirror;
@@ -10,13 +11,16 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     
     protected final Code code;
     protected final MethodCache cache;
+    protected final Type stub;
     protected volatile Type object;
     
+    @SuppressWarnings("unchecked")
     public LocalHandle(VMServer server, Code code, Type object) {
         super(server);
         this.code = code;
         this.object = object;
         this.cache = MethodCache.direct();
+        this.stub = Mimic.create(this::reference, (Class<Type>) object.getClass());
     }
     
     @Override
@@ -37,7 +41,7 @@ public class LocalHandle<Type> extends ServerLinkedHandle<Type> implements Handl
     
     @Override
     public Type stub() {
-        return object;
+        return stub;
     }
     
     @Override

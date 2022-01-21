@@ -10,6 +10,7 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
     
     protected final Class<Type> type;
     protected final Code code;
+    protected final Type stub;
     protected volatile Type object;
     protected volatile MethodExecutor executor = this::invoke;
     
@@ -23,6 +24,14 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
         this.type = type;
         if (executor != null) this.executor = executor;
         this.object = Mimic.create(this.executor, type);
+        this.stub = Mimic.create(this::invoke, type);
+    }
+    
+    Object invoke(Object proxy, MethodErasure erasure, Object... arguments) {
+        if (this.server instanceof RemoteVMServer server) {
+            return server.call(code, erasure, arguments);
+        }
+        return null;
     }
     
     @Override
@@ -42,7 +51,7 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
     
     @Override
     public Type stub() {
-        return object;
+        return stub;
     }
     
     @Override
@@ -64,13 +73,6 @@ public class RemoteHandle<Type> extends ServerLinkedHandle<Type> implements Hand
     @Override
     public Object callMethod(MethodErasure erasure, Object... arguments) {
         return invoke(null, erasure, arguments);
-    }
-    
-    Object invoke(Object proxy, MethodErasure erasure, Object... arguments) {
-        if (this.server instanceof RemoteVMServer server) {
-            return server.call(code, erasure, arguments);
-        }
-        return null;
     }
     
     @Override

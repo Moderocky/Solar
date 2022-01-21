@@ -32,6 +32,10 @@ public interface Handle<Type> {
         return false;
     }
     
+    default Object callMethod(Object proxy, MethodErasure erasure, Object... arguments) throws NoSuchMethodException {
+        return this.callMethod(erasure, arguments);
+    }
+    
     Object callMethod(MethodErasure erasure, Object... arguments) throws NoSuchMethodException;
     
 }
