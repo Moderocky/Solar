@@ -124,8 +124,9 @@ public class LocalVMServer extends JVMServer {
                     final VMServer owner = establishLink(target);
                     if (!handle.hasReins()) object = handle.owner().acquire(code, target);
                     else object = handle.reference();
-                    handle.dispatchReins(owner);
+                    final boolean dispatch = handle.dispatchReins(owner);
                     this.marshaller.transfer(object, socket.getOutputStream());
+                    assert dispatch;
                 }
                 case Protocol.SEND_OBJECT -> {
                     final Code code = Code.read(stream);
